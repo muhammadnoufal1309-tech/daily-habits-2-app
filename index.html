@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Daily Habits</title>
+    <style>
+      /* ===== RESET & BASE STYLES ===== */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      body {
+        background-color: #f5f5f5;
+        padding: 20px;
+        color: #333;
+      }
+
+      /* ===== CONTAINER STYLES ===== */
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: white;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+      }
+
+      h1 {
+        text-align: center;
+        margin-bottom: 20px;
+        color: #0f151c;
+      }
+
+      /* ===== INPUT SECTION STYLES ===== */
+      .input-section {
+        display: flex;
+        margin-bottom: 20px;
+      }
+
+      #taskInput {
+        flex: 1;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 5px 0 0 5px;
+        font-size: 16px;
+      }
+
+      #addBtn {
+        padding: 12px 20px;
+        background-color: #34db7f;
+        color: white;
+        border: none;
+        border-radius: 0 5px 5px 0;
+        cursor: pointer;
+        font-size: 16px;
+      }
+
+      #addBtn:hover {
+        background-color: #2bc971;
+      }
+
+      /* ===== PRIORITY SECTION STYLES ===== */
+      .priority-section {
+        margin-bottom: 15px;
+        text-align: center;
+      }
+
+      /* Warna border untuk setiap prioritas */
+      .priority-low {
+        border-left: 4px solid #27ae60;
+      } /* Hijau untuk prioritas rendah */
+      .priority-medium {
+        border-left: 4px solid #f39c12;
+      } /* Kuning untuk prioritas sedang */
+      .priority-high {
+        border-left: 4px solid #e74c3c;
+      } /* Merah untuk prioritas tinggi */
+
+      /* ===== FILTER SECTION STYLES ===== */
+      .filter-section {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 20px;
+      }
+
+      .filter-btn {
+        padding: 8px 16px;
+        margin: 0 5px;
+        background-color: #ecf0f1;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+
+      .filter-btn.active {
+        background-color: #34db7f;
+        color: white;
+      }
+
+      /* ===== TASK LIST STYLES ===== */
+      ul {
+        list-style-type: none;
+      }
+
+      li {
+        display: flex;
+        align-items: center;
+        padding: 12px;
+        border-bottom: 1px solid #eee;
+        transition: background-color 0.2s;
+      }
+
+      li:hover {
+        background-color: #f9f9f9;
+      }
+
+      /* Style untuk tugas yang sudah selesai */
+      li.completed {
+        color: #535c5c;
+      }
+
+      li.completed .task-text {
+        text-decoration: line-through;
+      }
+
+      .task-text {
+        flex: 1;
+        margin-left: 10px;
+      }
+
+      /* ===== DELETE BUTTON STYLES ===== */
+      .delete-btn {
+        background-color: #e74c3c;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        padding: 5px 10px;
+        cursor: pointer;
+      }
+
+      .delete-btn:hover {
+        background-color: #c0392b;
+      }
+
+      /* ===== EMPTY STATE STYLES ===== */
+      .empty-state {
+        text-align: center;
+        padding: 20px;
+        color: #4a5252;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Kegiatan Harian</h1>
+
+      <!-- SECTION 1: Input untuk menambah tugas baru -->
+      <div class="input-section">
+        <input type="text" id="taskInput" placeholder="Tambah kegiatan baru" />
+        <button id="addBtn">Tambah</button>
+      </div>
+
+      <!-- SECTION 2: Pilihan prioritas tugas -->
+      <div class="priority-section">
+        <label>Prioritas:</label>
+        <select id="prioritySelect">
+          <option value="low">Rendah</option>
+          <option value="medium" selected>Sedang</option>
+          <option value="high">Tinggi</option>
+        </select>
+      </div>
+
+      <!-- SECTION 3: Filter untuk menampilkan tugas -->
+      <div class="filter-section">
+        <button class="filter-btn active" data-filter="all">Semua</button>
+        <button class="filter-btn" data-filter="active">Belum Selesai</button>
+        <button class="filter-btn" data-filter="completed">Selesai</button>
+      </div>
+
+      <!-- SECTION 4: Daftar tugas akan muncul di sini -->
+      <ul id="taskList">
+        <!-- Daftar tugas akan dimuat secara dinamis oleh JavaScript -->
+      </ul>
+    </div>
+
+    <script>
+      // ==================== VARIABEL & ELEMEN DOM ====================
+      // Mendapatkan elemen-elemen HTML yang akan di manipulasi
+      const taskInput = document.getElementById("taskInput"); // Input text untuk tugas baru
+      const addBtn = document.getElementById("addBtn"); // Tombol tambah tugas
+      const taskList = document.getElementById("taskList"); // Container daftar tugas
+      const filterBtns = document.querySelectorAll(".filter-btn"); // Tombol-tombol filter
+
+      let currentFilter = "all"; // Menyimpan filter yang aktif: all, active, completed
+
+      // ==================== SISTEM PENGINGAT TUGAS ====================
+
+      // FUNGSI: Mengecek tugas yang belum selesai
+      function checkPendingTasks() {
+        const tasks = getTasksFromStorage();
+        const pendingTasks = tasks.filter((task) => !task.completed);
+
+        if (pendingTasks.length > 0) {
+          showNotification(
+            `⏳ Anda memiliki ${pendingTasks.length} tugas yang belum selesai!`
+          );
+        }
+      }
+
+      // FUNGSI NOTIFIKASI
+      function showNotification(message) {
+        if (!("Notification" in window)) {
+          console.log("Browser tidak support notifications");
+          return;
+        }
+
+        if (Notification.permission === "granted") {
+          new Notification("📝 Daily Habits Reminder", {
+            body: message,
+            icon: "/favicon.ico",
+          });
+        } else if (Notification.permission !== "denied") {
+          Notification.requestPermission().then((permission) => {
+            if (permission === "granted") {
+              new Notification("📝 Daily Habits Reminder", {
+                body: message,
+              });
+            }
+          });
+        }
+      }
+
+      // JALANKAN PENGINGAT SETIAP 2 JAM
+      setInterval(checkPendingTasks, 5 * 1000); // 2 jam dalam milidetik
+
+      // ==================== EVENT LISTENERS ====================
+
+      // Memuat tugas dari localStorage saat halaman pertama kali dibuka
+      document.addEventListener("DOMContentLoaded", loadTasks);
+
+      // Event untuk tombol tambah (klik dan enter)
+      addBtn.addEventListener("click", addTask);
+      taskInput.addEventListener("keypress", function (e) {
+        if (e.key === "Enter") {
+          addTask();
+        }
+      });
+
+      // Event untuk tombol filter
+      filterBtns.forEach((btn) => {
+        btn.addEventListener("click", function () {
+          // Hapus status active dari semua tombol filter
+          filterBtns.forEach((b) => b.classList.remove("active"));
+          // Tambah status active ke tombol yang diklik
+          this.classList.add("active");
+          // Update filter yang aktif
+          currentFilter = this.getAttribute("data-filter");
+          // Tampilkan tugas sesuai filter
+          filterTasks();
+        });
+      });
+
+      // ==================== FUNGSI UTAMA ====================
+
+      // FUNGSI 1: Menambah tugas baru
+      function addTask() {
+        const taskText = taskInput.value.trim(); // Ambil text dari input
+
+        // Validasi: pastikan input tidak kosong
+        if (taskText === "") {
+          alert("Silakan masukkan tugas!");
+          return;
+        }
+
+        // Buat objek tugas baru
+        const task = {
+          id: Date.now(), // ID unik berdasarkan timestamp
+          text: taskText,
+          completed: false, // Status belum selesai
+          priority: document.getElementById("prioritySelect").value, // Prioritas dari dropdown
+        };
+
+        // Tambah tugas ke tampilan dan simpan ke storage
+        addTaskToDOM(task);
+        saveTaskToStorage(task);
+
+        // Reset input dan fokus kembali
+        taskInput.value = "";
+        taskInput.focus();
+
+        // Periksa apakah daftar kosong
+        checkEmptyState();
+      }
+
+      // FUNGSI 2: Menampilkan tugas ke dalam DOM
+      function addTaskToDOM(task) {
+        // Buat elemen <li> baru
+        const li = document.createElement("li");
+        li.setAttribute("data-id", task.id); // Simpan ID tugas sebagai atribut
+        li.classList.add(`priority-${task.priority}`); // Tambah class prioritas untuk warna border
+
+        // Jika tugas sudah selesai, tambah class completed
+        if (task.completed) {
+          li.classList.add("completed");
+        }
+
+        // Isi konten elemen <li> dengan checkbox, text tugas, dan tombol hapus
+        li.innerHTML = `
+                <input type="checkbox" ${task.completed ? "checked" : ""}>
+                <span class="task-text">${task.text}</span>
+                <button class="delete-btn">Hapus</button>
+            `;
+
+        // Event untuk checkbox (toggle status selesai/belum)
+        const checkbox = li.querySelector('input[type="checkbox"]');
+        checkbox.addEventListener("change", toggleTask);
+
+        // Event untuk tombol hapus
+        const deleteBtn = li.querySelector(".delete-btn");
+        deleteBtn.addEventListener("click", deleteTask);
+
+        // Tambah elemen <li> ke dalam daftar
+        taskList.appendChild(li);
+      }
+
+      // FUNGSI 3: Mengubah status tugas (selesai/belum)
+      function toggleTask(e) {
+        const li = e.target.parentElement; // Dapatkan elemen <li> parent
+        const taskId = li.getAttribute("data-id"); // Dapatkan ID tugas
+
+        // Ambil semua tugas dari storage
+        let tasks = getTasksFromStorage();
+
+        // Update status tugas yang sesuai
+        tasks = tasks.map((task) => {
+          if (task.id == taskId) {
+            task.completed = !task.completed; // Toggle status
+          }
+          return task;
+        });
+
+        // Simpan perubahan ke localStorage
+        localStorage.setItem("tasks", JSON.stringify(tasks));
+
+        // Update tampilan
+        li.classList.toggle("completed");
+
+        // Jika filter aktif bukan "all", refresh tampilan
+        if (currentFilter !== "all") {
+          filterTasks();
+        }
+      }
+
+      // FUNGSI 4: Menghapus tugas
+      function deleteTask(e) {
+        const li = e.target.parentElement;
+        const taskId = li.getAttribute("data-id");
+
+        // Hapus dari tampilan
+        li.remove();
+
+        // Hapus dari storage
+        removeTaskFromStorage(taskId);
+
+        // Periksa apakah daftar sekarang kosong
+        checkEmptyState();
+      }
+
+      // FUNGSI 5: Memfilter tugas berdasarkan status
+      function filterTasks() {
+        const tasks = getTasksFromStorage();
+
+        // Filter tugas berdasarkan currentFilter
+        const filteredTasks = tasks.filter((task) => {
+          if (currentFilter === "active") return !task.completed; // Hanya yang belum selesai
+          if (currentFilter === "completed") return task.completed; // Hanya yang sudah selesai
+          return true; // Tampilkan semua
+        });
+
+        // Kosongkan daftar dan tampilkan tugas yang difilter
+        taskList.innerHTML = "";
+        filteredTasks.forEach((task) => addTaskToDOM(task));
+
+        // Periksa state kosong
+        checkEmptyState();
+      }
+
+      // FUNGSI 6: Mengecek dan menampilkan pesan jika daftar kosong
+      function checkEmptyState() {
+        const tasks = getTasksFromStorage();
+
+        // Filter tugas sesuai filter yang aktif
+        const filteredTasks = tasks.filter((task) => {
+          if (currentFilter === "active") return !task.completed;
+          if (currentFilter === "completed") return task.completed;
+          return true;
+        });
+
+        // Hapus pesan kosong yang sudah ada (jika ada)
+        const oldMsg = taskList.querySelector(".empty-state");
+        if (oldMsg) oldMsg.remove();
+
+        // Jika tidak ada tugas yang sesuai filter, tampilkan pesan
+        if (filteredTasks.length === 0) {
+          const emptyState = document.createElement("div");
+          emptyState.className = "empty-state";
+
+          // Sesuaikan pesan berdasarkan filter yang aktif
+          if (currentFilter === "all") {
+            emptyState.textContent = "Tidak ada tugas. Tambahkan tugas baru!";
+          } else if (currentFilter === "active") {
+            emptyState.textContent = "Tidak ada tugas aktif. Selamat!";
+          } else {
+            emptyState.textContent =
+              "Tidak ada tugas yang selesai. Ayo kerjakan tugasmu!";
+          }
+
+          taskList.appendChild(emptyState);
+        }
+      }
+
+      // FUNGSI 7: Memuat tugas dari localStorage saat halaman dimuat
+      function loadTasks() {
+        const tasks = getTasksFromStorage();
+        tasks.forEach((task) => addTaskToDOM(task));
+        checkEmptyState();
+      }
+
+      // ==================== FUNGSI STORAGE ====================
+
+      // FUNGSI 8: Mendapatkan semua tugas dari localStorage
+      function getTasksFromStorage() {
+        let tasks;
+        // Jika belum ada data, buat array kosong
+        if (localStorage.getItem("tasks") === null) {
+          tasks = [];
+        } else {
+          // Parse data dari string JSON ke array object
+          tasks = JSON.parse(localStorage.getItem("tasks"));
+        }
+        return tasks;
+      }
+
+      // FUNGSI 9: Menyimpan tugas ke localStorage
+      function saveTaskToStorage(task) {
+        const tasks = getTasksFromStorage();
+        tasks.push(task); // Tambah tugas baru ke array
+        localStorage.setItem("tasks", JSON.stringify(tasks)); // Simpan ke localStorage
+      }
+
+      // FUNGSI 10: Menghapus tugas dari localStorage
+      function removeTaskFromStorage(id) {
+        let tasks = getTasksFromStorage();
+        // Filter: simpan hanya tugas yang ID-nya tidak sama dengan yang dihapus
+        tasks = tasks.filter((task) => task.id != id);
+        localStorage.setItem("tasks", JSON.stringify(tasks));
+      }
+    </script>
+
+    <footer
+      style="
+        text-align: center;
+        margin-top: 500px;
+        padding: 10px;
+        color: #111617;
+      "
+    >
+      Created by Kelompok 4
+    </footer>
+  </body>
+</html>
